@@ -1,0 +1,32 @@
+name: Run tests
+
+on: [push]
+
+env: 
+  MONGO_VERSION: 4.2.5
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+
+    - name: Download MongoDB
+      run: |
+        wget http://downloads.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1804-$MONGO_VERSION.tgz
+        tar xzvf mongodb-linux-x86_64-ubuntu1804-$MONGO_VERSION.tgz
+        mkdir $PWD/db
+
+    - name: Start mongod server and run script
+      run: |
+        export PATH=$PWD/mongodb-linux-x86_64-ubuntu1804-$MONGO_VERSION/bin:$PATH
+        mkdir -p /home/runner/data/db
+        ./deploy.sh config.txt /home/runner/data/db
+    
+    - name: Check result and make sure all shards are up
+      run: |
+        cat result.txt
+        grep shard0000 result.txt
+        grep shard0001 result.txt
