@@ -1,6 +1,9 @@
 # mongodbShardedCluster
+
 deploy a mongodb sharded cluster on a local machine 
 
+WARNING: do not use this in production environment. This script
+is only intended for setting up a test environment
 
 ### Run 
 
@@ -31,5 +34,5 @@ shard=localhost:27022
 then run 
 
 ```shell
-./deploy.sh config.txt
+./deploy.sh config.txt /path/to/db/folder
 ```
