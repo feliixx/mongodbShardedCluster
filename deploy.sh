@@ -34,7 +34,7 @@ declare -a CONFIG_HOSTS CONFIG_PORTS SHARD_HOSTS SHARD_PORTS CONFIG_URL
 
 cleanup() {
 
-  rm -f *.log
+  rm -f ./*.log
   rm -r "$dbfolder"/config0 "$dbfolder"/config1 "$dbfolder"/config2 "$dbfolder"/shard0 "$dbfolder"/shard1
 }
 
