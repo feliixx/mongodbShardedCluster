@@ -29,18 +29,12 @@ fi
 
 config=$1
 dbfolder=$2
-conf_svr_log="conf_svr.log"
-mongos_log="mongos.log"
-shard_log="shard.log"
 
 declare -a CONFIG_HOSTS CONFIG_PORTS SHARD_HOSTS SHARD_PORTS CONFIG_URL
 
 cleanup() {
 
-  echo "" >$conf_svr_log
-  echo "" >$mongos_log
-  echo "" >$shard_log
-
+  rm -f *.log
   rm -r "$dbfolder"/config0 "$dbfolder"/config1 "$dbfolder"/config2 "$dbfolder"/shard0 "$dbfolder"/shard1
 }
 
@@ -77,7 +71,7 @@ start_config_server() {
   for index in "${!CONFIG_HOSTS[@]}"; do
     mkdir "$dbfolder"/config"$index"
     echo "starting config server $index"
-    mongod --configsvr --port "${CONFIG_PORTS[index]}" --dbpath "$dbfolder"/config"$index" --replSet conf --logpath $conf_svr_log --fork
+    mongod --configsvr --port "${CONFIG_PORTS[index]}" --dbpath "$dbfolder"/config"$index" --replSet conf --logpath "conf_svr_$index.log" --fork
     sleep 1
   done
 
@@ -91,7 +85,7 @@ start_config_server() {
 
 start_mongos() {
 
-  mongos --port "${MONGOS_PORT[0]}" --configdb "conf/${CONFIG_URL[0]},${CONFIG_URL[1]},${CONFIG_URL[2]}" --logpath $mongos_log --fork
+  mongos --port "${MONGOS_PORT[0]}" --configdb "conf/${CONFIG_URL[0]},${CONFIG_URL[1]},${CONFIG_URL[2]}" --logpath "mongos.log" --fork
 
   echo "${green}mongos instance configured${reset}"
 }
@@ -101,7 +95,7 @@ start_shards() {
   for index in "${!SHARD_HOSTS[@]}"; do
     mkdir "$dbfolder"/shard"$index"
     echo "starting shard $index"
-    mongod --shardsvr --port "${SHARD_PORTS[index]}" --dbpath "$dbfolder"/shard"$index" --logpath $shard_log --fork
+    mongod --shardsvr --port "${SHARD_PORTS[index]}" --dbpath "$dbfolder"/shard"$index" --logpath "shard_$index.log" --fork
     sleep 5
     mongo --host "${MONGOS_HOST[0]}" --port "${MONGOS_PORT[0]}" --eval "sh.addShard(\"${SHARD_HOSTS[$index]}:${SHARD_PORTS[$index]}\");" &
     sleep 5
