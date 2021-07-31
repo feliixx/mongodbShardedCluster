@@ -2,14 +2,11 @@ name: Run tests
 
 on: push
 
-env: 
-  MONGO_VERSION: 4.4.2
-
 jobs:
-  build:
-    runs-on: ubuntu-18.04
 
-    steps:
+  static_check:
+    runs-on: ubuntu-18.04
+    steps: 
     - name: Check out code
       uses: actions/checkout@v2
 
@@ -18,15 +15,31 @@ jobs:
       with:
         severity: info
 
+
+  build:
+    runs-on: ubuntu-18.04
+    needs: static_check
+    strategy:
+      matrix:
+        mongodb-version: [4.2.15, 4.4.7, 5.0.1]
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+
+    - name: Export env variables
+      run: |
+        echo "UBUNTU_VERSION=linux-x86_64-ubuntu$(lsb_release -r | tr -d '[:alpha:][:blank:][:punct:]')" >> $GITHUB_ENV
+        echo "MONGO_VERSION=$( echo ${{ matrix.mongodb-version }} | tr -d '[:alpha:][=-=]')" >> $GITHUB_ENV
+
     - name: Download MongoDB
       run: |
-        wget http://downloads.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1804-$MONGO_VERSION.tgz
-        tar xzvf mongodb-linux-x86_64-ubuntu1804-$MONGO_VERSION.tgz
-        mkdir $PWD/db
+        wget -q http://downloads.mongodb.org/linux/mongodb-$UBUNTU_VERSION-$MONGO_VERSION.tgz
+        tar xzvf mongodb-$UBUNTU_VERSION-$MONGO_VERSION.tgz
+        echo "$PWD/mongodb-$UBUNTU_VERSION-$MONGO_VERSION/bin" >> $GITHUB_PATH
 
-    - name: Start mongod server and run script
+    - name: Create DB dir and launch cluster
       run: |
-        export PATH=$PWD/mongodb-linux-x86_64-ubuntu1804-$MONGO_VERSION/bin:$PATH
         mkdir -p /home/runner/data/db
         ./deploy.sh config.txt /home/runner/data/db
     
