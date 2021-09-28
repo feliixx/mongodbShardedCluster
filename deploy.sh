@@ -6,7 +6,7 @@
 # this script setup a sharded cluster on a local machine.
 # To run this script, use the command:
 #
-#   ./deploy.sh path/to/config.txt /path/to/db/folder
+#   ./deploy.sh /path/to/db/folder nb_shard
 #
 # make sure that mongod, mongos and mongo are linked correctly
 # you can achieved this using the following command:
@@ -18,94 +18,89 @@ green=$(tput setaf 2)
 reset=$(tput sgr0)
 
 if [ -z "$1" ]; then
-  echo "${red}No configuration file provided${reset}"
-  exit 1
-fi
-
-if [ -z "$2" ]; then
   echo "${red}No db folder specified${reset}"
   exit 1
 fi
 
-config=$1
-dbfolder=$2
+if [ -z "$2" ]; then
+  echo "${red}Number of shard is missing${reset}"
+  exit 1
+fi
 
-declare -a CONFIG_HOSTS CONFIG_PORTS SHARD_HOSTS SHARD_PORTS CONFIG_URL
+dbfolder=$1
+nb_shard=$2
 
 cleanup() {
-
-  rm -f ./*.log
-  rm -r "$dbfolder"/config0 "$dbfolder"/config1 "$dbfolder"/config2 "$dbfolder"/shard0 "$dbfolder"/shard1
-}
-
-parse_config() {
-
-  declare -A key_labels
-  key_labels["config"]="mongod config server"
-  key_labels["mongos"]="mongos instance"
-  key_labels["shard"]="shard instance"
-
-  while IFS='=:' read -r key host port; do
-    printf '%s: %s:%s\n' "${key_labels[$key]}" "$host" "$port"
-    case "$key" in
-    "config")
-      CONFIG_HOSTS+=("$host")
-      CONFIG_PORTS+=("$port")
-      CONFIG_URL+=("$host:$port")
-      ;;
-    "mongos")
-      MONGOS_HOST="$host"
-      MONGOS_PORT="$port"
-      ;;
-    "shard")
-      SHARD_HOSTS+=("$host")
-      SHARD_PORTS+=("$port")
-      ;;
-    esac
-  done < <(sed '/^[[:space:]]*\(#.*\)\?$/d' "$config")
-
+  rm -r "$dbfolder"/logs "$dbfolder"/config0 "$dbfolder"/config1 "$dbfolder"/config2
+  rm -r "$dbfolder"/shard*
+  mkdir "$dbfolder"/logs
 }
 
 start_config_server() {
 
-  for index in "${!CONFIG_HOSTS[@]}"; do
-    mkdir "$dbfolder"/config"$index"
-    echo "starting config server $index"
-    mongod --configsvr --port "${CONFIG_PORTS[index]}" --dbpath "$dbfolder"/config"$index" --replSet conf --logpath "conf_svr_$index.log" --fork
+  config_port=27018
+
+  for i in $(seq 1 3)
+  do 
+    mkdir "$dbfolder"/config"$i"
+    echo "starting config server $i"
+    mongod --configsvr --port "$config_port" --dbpath "$dbfolder"/config"$i" --replSet conf --logpath "$dbfolder/logs/conf_svr_$i.log" --fork
     sleep 1
+    ((config_port++))
   done
 
   sleep 10
 
   echo "${green}config servers deployed${reset}"
 
-  mongo --host "${CONFIG_HOSTS[0]}" --port "${CONFIG_PORTS[0]}" --eval "rs.initiate( { _id: \"conf\", members: [ {_id: 0, host:\"${CONFIG_URL[0]}\"}, {_id: 1, host:\"${CONFIG_URL[1]}\"}, {_id: 2, host:\"${CONFIG_URL[2]}\"} ]})" &
+  mongo --port 27018 --eval "rs.initiate( { _id: \"conf\", members: [ {_id: 0, host:\"localhost:27018\"}, {_id: 1, host:\"localhost:27019\"}, {_id: 2, host:\"localhost:27020\"} ]})" &
 
 }
 
 start_mongos() {
 
-  mongos --port "${MONGOS_PORT[0]}" --configdb "conf/${CONFIG_URL[0]},${CONFIG_URL[1]},${CONFIG_URL[2]}" --logpath "mongos.log" --fork
+  mongos --port 27017 --configdb "conf/localhost:27018,localhost:27019,localhost:27020" --logpath "$dbfolder/logs/mongos.log" --fork
 
   echo "${green}mongos instance configured${reset}"
 }
 
 start_shards() {
 
-  for index in "${!SHARD_HOSTS[@]}"; do
+  first_rs_port=27021
+  second_rs_port=27022
+  index=1
+
+  for i in $(seq 1 "$nb_shard")
+  do 
+
+    echo "starting shard $i"
+
     mkdir "$dbfolder"/shard"$index"
-    echo "starting shard $index"
-    mongod --shardsvr --port "${SHARD_PORTS[index]}" --dbpath "$dbfolder"/shard"$index" --logpath "shard_$index.log" --fork
+    mongod --shardsvr --replSet "shardRs$i" --port "$first_rs_port" --dbpath "$dbfolder"/shard"$index" --logpath "$dbfolder/logs/shard_$index.log" --fork
+    sleep 1
+
+    ((index+=1))
+
+    mkdir "$dbfolder"/shard"$index"
+    mongod --shardsvr --replSet "shardRs$i" --port "$second_rs_port" --dbpath "$dbfolder"/shard"$index" --logpath "$dbfolder/logs/shard_$index.log" --fork
+    sleep 1
+
+    ((index+=1))
+
+    mongo --port "$second_rs_port" --eval "rs.initiate( { _id: \"shardRs$i\", members: [ {_id: 0, host:\"localhost:$first_rs_port\"}, {_id: 1, host:\"localhost:$second_rs_port\"} ]})" &
     sleep 5
-    mongo --host "${MONGOS_HOST[0]}" --port "${MONGOS_PORT[0]}" --eval "sh.addShard(\"${SHARD_HOSTS[$index]}:${SHARD_PORTS[$index]}\");" &
-    sleep 5
-    echo "${green}shard  ${SHARD_HOSTS[$index]}:${SHARD_PORTS[$index]} added${reset}"
+  
+    mongo --eval "sh.addShard(\"shardRs$i/localhost:$first_rs_port\");" &
+    echo "${green}shard  $i added${reset}"
+
+    ((first_rs_port+=2))
+    ((second_rs_port+=2))
+
   done
 
 }
 
 cleanup
-parse_config
 
 start_config_server
 sleep 15
@@ -114,6 +109,7 @@ start_mongos
 sleep 5
 
 start_shards
+sleep 15 
 
 # make sure that the sharded cluster has been deployed correctly
-mongo --host "${MONGOS_HOST[0]}" --port "${MONGOS_PORT[0]}" --eval "sh.status();" >result.txt
+mongo --eval "sh.status();" >result.txt

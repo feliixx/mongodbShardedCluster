@@ -21,7 +21,7 @@ jobs:
     needs: static_check
     strategy:
       matrix:
-        mongodb-version: [4.2.15, 4.4.7, 5.0.1]
+        mongodb-version: [4.2.16, 4.4.9, 5.0.3]
 
     steps:
     - name: Check out code
@@ -41,10 +41,10 @@ jobs:
     - name: Create DB dir and launch cluster
       run: |
         mkdir -p /home/runner/data/db
-        ./deploy.sh config.txt /home/runner/data/db
+        ./deploy.sh /home/runner/data/db 2
     
     - name: Check result and make sure all shards are up
       run: |
         cat result.txt
-        grep shard0000 result.txt
-        grep shard0001 result.txt
+        grep shardRs1 result.txt
+        grep shardRs2 result.txt
