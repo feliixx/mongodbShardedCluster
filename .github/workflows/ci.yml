@@ -5,10 +5,10 @@ on: push
 jobs:
 
   static_check:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps: 
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - name: Shell script static cheking
       uses: ludeeus/action-shellcheck@master
@@ -17,19 +17,19 @@ jobs:
 
 
   build:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     needs: static_check
     strategy:
       matrix:
-        mongodb-version: [4.2.16, 4.4.9, 5.0.3]
+        mongodb-version: [5.0.21, 6.0.9, 7.0.1]
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - name: Export env variables
       run: |
-        echo "UBUNTU_VERSION=linux-x86_64-ubuntu$(lsb_release -r | tr -d '[:alpha:][:blank:][:punct:]')" >> $GITHUB_ENV
+        echo "UBUNTU_VERSION=linux-x86_64-ubuntu2004" >> $GITHUB_ENV
         echo "MONGO_VERSION=$( echo ${{ matrix.mongodb-version }} | tr -d '[:alpha:][=-=]')" >> $GITHUB_ENV
 
     - name: Download MongoDB
