@@ -53,7 +53,7 @@ start_config_server() {
 
   echo "${green}config servers deployed${reset}"
 
-  mongo --port 27018 --eval "rs.initiate( { _id: \"conf\", members: [ {_id: 0, host:\"localhost:27018\"}, {_id: 1, host:\"localhost:27019\"}, {_id: 2, host:\"localhost:27020\"} ]})" &
+  mongosh --port 27018 --eval "rs.initiate( { _id: \"conf\", members: [ {_id: 0, host:\"localhost:27018\"}, {_id: 1, host:\"localhost:27019\"}, {_id: 2, host:\"localhost:27020\"} ]})" &
 
 }
 
@@ -87,10 +87,10 @@ start_shards() {
 
     ((index+=1))
 
-    mongo --port "$second_rs_port" --eval "rs.initiate( { _id: \"shardRs$i\", members: [ {_id: 0, host:\"localhost:$first_rs_port\"}, {_id: 1, host:\"localhost:$second_rs_port\"} ]})" &
+    mongosh --port "$second_rs_port" --eval "rs.initiate( { _id: \"shardRs$i\", members: [ {_id: 0, host:\"localhost:$first_rs_port\"}, {_id: 1, host:\"localhost:$second_rs_port\"} ]})" &
     sleep 5
   
-    mongo --eval "sh.addShard(\"shardRs$i/localhost:$first_rs_port\");" &
+    mongosh --eval "sh.addShard(\"shardRs$i/localhost:$first_rs_port\");" &
     echo "${green}shard  $i added${reset}"
 
     ((first_rs_port+=2))
@@ -112,4 +112,4 @@ start_shards
 sleep 15 
 
 # make sure that the sharded cluster has been deployed correctly
-mongo --eval "sh.status();" >result.txt
+mongosh --eval "sh.status();" >result.txt
