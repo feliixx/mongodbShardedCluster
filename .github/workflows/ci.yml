@@ -2,6 +2,10 @@ name: Run tests
 
 on: push
 
+env:
+  UBUNTU_VERSION: linux-x86_64-ubuntu2004
+  MONGOSH_VERSION: 2.3.4
+
 jobs:
 
   static_check:
@@ -21,22 +25,26 @@ jobs:
     needs: static_check
     strategy:
       matrix:
-        mongodb-version: [5.0.21, 6.0.9, 7.0.1]
+        mongodb-version: [6.0.19, 7.0.15, 8.0.3]
 
     steps:
     - name: Check out code
       uses: actions/checkout@v4
 
     - name: Export env variables
-      run: |
-        echo "UBUNTU_VERSION=linux-x86_64-ubuntu2004" >> $GITHUB_ENV
-        echo "MONGO_VERSION=$( echo ${{ matrix.mongodb-version }} | tr -d '[:alpha:][=-=]')" >> $GITHUB_ENV
+      run: echo "MONGO_VERSION=$( echo ${{ matrix.mongodb-version }} | tr -d '[:alpha:][=-=]')" >> $GITHUB_ENV
 
     - name: Download MongoDB
       run: |
         wget -q http://downloads.mongodb.org/linux/mongodb-$UBUNTU_VERSION-$MONGO_VERSION.tgz
         tar xzvf mongodb-$UBUNTU_VERSION-$MONGO_VERSION.tgz
         echo "$PWD/mongodb-$UBUNTU_VERSION-$MONGO_VERSION/bin" >> $GITHUB_PATH
+
+    - name: Download mongosh
+      run: |
+        wget -q https://downloads.mongodb.com/compass/mongosh-$MONGOSH_VERSION-linux-x64.tgz
+        tar xvzf mongosh-$MONGOSH_VERSION-linux-x64.tgz
+        echo "$PWD/mongosh-$MONGOSH_VERSION-linux-x64/bin" >> $GITHUB_PATH
 
     - name: Create DB dir and launch cluster
       run: |
